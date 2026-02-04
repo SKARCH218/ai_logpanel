@@ -9,7 +9,6 @@ object FontLoader {
             // 커스텀 폰트 로딩은 플랫폼별 구현이 필요함
             FontFamily.Monospace
         } catch (e: Exception) {
-            println("D2Coding 폰트 로드 실패: ${e.message}")
             FontFamily.Monospace
         }
     }
