@@ -1,5 +1,7 @@
 # AI Log Panel
 
+<img width="1024" height="512" alt="logo_big" src="https://github.com/user-attachments/assets/4391a8ec-1991-47b1-b7c1-f5bf78d2b615" />
+
 AI Log Panel은 Kotlin Multiplatform Compose 기반의 데스크탑(JVM) 서버 관리 및 로그 분석 도구입니다. SSH/로컬 서버를 등록하고, 실시간 로그 모니터링, 오류 탐지, AI 기반 로그 분석, 서버 성능 모니터링(CPU/RAM/네트워크) 등 다양한 기능을 제공합니다.
 
 ## 주요 기능
