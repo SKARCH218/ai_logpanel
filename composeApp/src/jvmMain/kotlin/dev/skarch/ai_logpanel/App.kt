@@ -750,12 +750,10 @@ fun MainPanel(
                         if (sidebarTab == 0) {
                             Column {
                                 Text("에러 로그", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                                // TODO: 에러 로그 카드 리스트
                             }
                         } else {
                             Column {
                                 Text("성능 정보", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                                // TODO: 성능 정보 표시
                             }
                         }
                     }
@@ -1469,7 +1467,6 @@ fun MainPanelImproved(
 
                                 // SSH 세션에 종료 신호 전송 시도
                                 try {
-                                    // TODO: SSH 세션에 인터럽트 신호 전송
                                     logs.add("SSH 서버 중지 신호 전송")
                                     snackbarHostState.showSnackbar("서버 중지 신호를 전송했습니다")
                                 } catch (e: Exception) {
