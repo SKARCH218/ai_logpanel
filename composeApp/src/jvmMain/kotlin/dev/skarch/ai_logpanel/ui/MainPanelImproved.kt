@@ -61,8 +61,13 @@ fun MainPanelImproved(
 
     // 로그 상태 관리
     var logs by remember { mutableStateOf(server?.logs?.toMutableList() ?: mutableListOf<String>()) }
-    val errorLogs = remember(logs) {
+    var errorLogs by remember { mutableStateOf(
         logs.filter { it.contains("error", true) || it.contains("fail", true) || it.contains("[ERROR]", true) }
+    ) }
+
+    // logs가 변경될 때마다 errorLogs 업데이트
+    LaunchedEffect(logs) {
+        errorLogs = logs.filter { it.contains("error", true) || it.contains("fail", true) || it.contains("[ERROR]", true) }
     }
 
     // 성능 데이터
@@ -246,6 +251,9 @@ fun MainPanelImproved(
                                 selectedErrorLog = log
                                 selectedAnalysis = analysis
                                 showAnalysisResult = true
+                            },
+                            onRemoveLog = { log ->
+                                errorLogs = errorLogs.filter { it != log }
                             }
                         )
                     }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -47,7 +48,8 @@ import kotlinx.coroutines.launch
 fun ErrorLogSidebar(
     errorLogs: List<String>,
     apiKey: String,
-    onShowAnalysis: (String, String?) -> Unit = { _, _ -> } // 오류 원문, 분석 결과
+    onShowAnalysis: (String, String?) -> Unit = { _, _ -> },
+    onRemoveLog: (String) -> Unit = {} // 오류 원문, 분석 결과
 ) {
     val listState = rememberLazyListState()
 
@@ -75,7 +77,7 @@ fun ErrorLogSidebar(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(errorLogs) { log ->
-                        ErrorLogCard(log, apiKey, onShowAnalysis)
+                        ErrorLogCard(log, apiKey, onShowAnalysis, onRemoveLog)
                     }
                 }
 
@@ -104,13 +106,15 @@ fun ErrorLogSidebar(
 fun ErrorLogCard(
     log: String,
     apiKey: String,
-    onShowAnalysis: (String, String?) -> Unit = { _, _ -> }
+    onShowAnalysis: (String, String?) -> Unit = { _, _ -> },
+    onRemoveLog: (String) -> Unit = {}
 ) {
     val logLower = log.lowercase()
     val isError = logLower.contains("error") || logLower.contains("✗") || logLower.contains("[error]")
     val isWarning = logLower.contains("warn") || logLower.contains("warning") || logLower.contains("[warn]")
 
-    var aiAnalysis by remember { mutableStateOf<String?>(null) }
+    // 저장된 분석 결과 로드
+    var aiAnalysis by remember { mutableStateOf(dev.skarch.ai_logpanel.utils.ServerStorage.loadAnalysisResult(log)) }
     var isAnalyzing by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -139,6 +143,7 @@ fun ErrorLogCard(
         shadowElevation = 2.dp
     ) {
         Column(Modifier.padding(16.dp)) {
+            // 상단 행: 아이콘 + 로그 + X 버튼
             Row(verticalAlignment = Alignment.Top) {
                 Text(icon, fontSize = 18.sp, color = iconColor)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -150,6 +155,22 @@ fun ErrorLogCard(
                         fontSize = 14.sp,
                         fontFamily = FontLoader.d2CodingFontFamily
                     )
+                }
+                // X 버튼 (우측 상단)
+                OutlinedButton(
+                    onClick = {
+                        onRemoveLog(log)
+                        // 분석 결과도 함께 삭제
+                        dev.skarch.ai_logpanel.utils.ServerStorage.deleteAnalysisResult(log)
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFFEF4444)
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    modifier = Modifier.width(36.dp).height(36.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text("✕", fontSize = 16.sp, color = Color(0xFFEF4444))
                 }
             }
 
@@ -199,6 +220,8 @@ fun ErrorLogCard(
                                     geminiRepository.analyzeLog(log).collect { analysis ->
                                         aiAnalysis = analysis
                                         isAnalyzing = false
+                                        // 분석 결과 저장
+                                        dev.skarch.ai_logpanel.utils.ServerStorage.saveAnalysisResult(log, analysis)
                                     }
                                 } catch (e: Exception) {
                                     aiAnalysis = "분석 실패: ${e.message}"

@@ -13,6 +13,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -229,7 +234,54 @@ fun AnalysisResultScreen(
                                 fontSize = 14.sp
                             )
                         },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f)
+                            .onKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
+                                    if (chatInput.isNotBlank() && !isProcessing) {
+                                        val question = chatInput
+                                        chatInput = ""
+
+                                        // 질문을 즉시 표시
+                                        chatHistory = chatHistory + (question to "AI가 생각중입니다...")
+                                        isProcessing = true
+
+                                        coroutineScope.launch {
+                                            try {
+                                                val geminiRepository = GeminiRepository(apiKey)
+
+                                                // 자유 형식으로 질문 (컨텍스트 간단하게)
+                                                val prompt = """
+                                                    다음 오류에 대한 질문입니다:
+                                                    
+                                                    [오류]
+                                                    $errorLog
+                                                    
+                                                    [질문]
+                                                    $question
+                                                    
+                                                    간단하고 명확하게 답변해주세요.
+                                                """.trimIndent()
+
+                                                var answer = ""
+                                                geminiRepository.analyzeLog(prompt).collect { chunk ->
+                                                    answer = chunk
+                                                }
+
+                                                // 마지막 질문의 답변 업데이트
+                                                chatHistory = chatHistory.dropLast(1) + (question to answer)
+                                                isProcessing = false
+                                            } catch (e: Exception) {
+                                                // 마지막 질문의 답변 업데이트
+                                                chatHistory = chatHistory.dropLast(1) + (question to "답변 실패: ${e.message}")
+                                                isProcessing = false
+                                            }
+                                        }
+                                    }
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
@@ -247,30 +299,39 @@ fun AnalysisResultScreen(
                             if (chatInput.isNotBlank() && !isProcessing) {
                                 val question = chatInput
                                 chatInput = ""
+
+                                // 질문을 즉시 표시
+                                chatHistory = chatHistory + (question to "AI가 생각중입니다...")
                                 isProcessing = true
 
                                 coroutineScope.launch {
                                     try {
                                         val geminiRepository = GeminiRepository(apiKey)
-                                        val context = """
-                                            원본 오류:
+
+                                        // 자유 형식으로 질문 (컨텍스트 간단하게)
+                                        val prompt = """
+                                            다음 오류에 대한 질문입니다:
+                                            
+                                            [오류]
                                             $errorLog
                                             
-                                            이전 분석 결과:
-                                            ${currentAnalysis ?: "없음"}
+                                            [질문]
+                                            $question
                                             
-                                            사용자 질문: $question
+                                            간단하고 명확하게 답변해주세요.
                                         """.trimIndent()
 
                                         var answer = ""
-                                        geminiRepository.analyzeLog(context).collect { chunk ->
+                                        geminiRepository.analyzeLog(prompt).collect { chunk ->
                                             answer = chunk
                                         }
 
-                                        chatHistory = chatHistory + (question to answer)
+                                        // 마지막 질문의 답변 업데이트
+                                        chatHistory = chatHistory.dropLast(1) + (question to answer)
                                         isProcessing = false
                                     } catch (e: Exception) {
-                                        chatHistory = chatHistory + (question to "답변 실패: ${e.message}")
+                                        // 마지막 질문의 답변 업데이트
+                                        chatHistory = chatHistory.dropLast(1) + (question to "답변 실패: ${e.message}")
                                         isProcessing = false
                                     }
                                 }
