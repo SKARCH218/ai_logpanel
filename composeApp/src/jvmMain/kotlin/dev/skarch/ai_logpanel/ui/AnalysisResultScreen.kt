@@ -19,6 +19,10 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.skarch.ai_logpanel.data.GeminiRepository
@@ -421,11 +425,12 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
                 line.startsWith("- ") || line.startsWith("* ") -> {
                     Row(modifier = Modifier.padding(vertical = 2.dp)) {
                         Text("• ", color = Color(0xFF2196F3), fontSize = 14.sp)
-                        Text(
+                        StyledText(
                             line.substring(2),
                             color = Color(0xFFE6EDF3),
                             fontSize = 14.sp,
-                            lineHeight = 20.sp
+                            lineHeight = 20.sp,
+                            modifier = Modifier
                         )
                     }
                 }
@@ -433,11 +438,12 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
                     val parts = line.split(". ", limit = 2)
                     Row(modifier = Modifier.padding(vertical = 2.dp)) {
                         Text("${parts[0]}. ", color = Color(0xFF2196F3), fontSize = 14.sp)
-                        Text(
+                        StyledText(
                             parts.getOrNull(1) ?: "",
                             color = Color(0xFFE6EDF3),
                             fontSize = 14.sp,
-                            lineHeight = 20.sp
+                            lineHeight = 20.sp,
+                            modifier = Modifier
                         )
                     }
                 }
@@ -445,7 +451,8 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 else -> {
-                    Text(
+                    // 인라인 스타일 처리 (**, *, `)
+                    StyledText(
                         line,
                         color = Color(0xFFE6EDF3),
                         fontSize = 14.sp,
@@ -457,3 +464,81 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
         }
     }
 }
+
+// 볼드, 이탤릭, 인라인 코드를 지원하는 텍스트
+@Composable
+fun StyledText(
+    text: String,
+    color: Color,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    lineHeight: androidx.compose.ui.unit.TextUnit,
+    modifier: Modifier = Modifier
+) {
+    val annotatedString = buildAnnotatedString {
+        var currentIndex = 0
+        val textLength = text.length
+
+        while (currentIndex < textLength) {
+            when {
+                // 볼드 처리 (**텍스트**)
+                text.startsWith("**", currentIndex) -> {
+                    val endIndex = text.indexOf("**", currentIndex + 2)
+                    if (endIndex != -1) {
+                        val boldText = text.substring(currentIndex + 2, endIndex)
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) {
+                            append(boldText)
+                        }
+                        currentIndex = endIndex + 2
+                    } else {
+                        append(text[currentIndex])
+                        currentIndex++
+                    }
+                }
+                // 인라인 코드 처리 (`텍스트`)
+                text.startsWith("`", currentIndex) && !text.startsWith("```", currentIndex) -> {
+                    val endIndex = text.indexOf("`", currentIndex + 1)
+                    if (endIndex != -1) {
+                        val codeText = text.substring(currentIndex + 1, endIndex)
+                        withStyle(SpanStyle(
+                            color = Color(0xFF58A6FF),
+                            fontFamily = FontLoader.d2CodingFontFamily,
+                            background = Color(0xFF0D1117)
+                        )) {
+                            append(codeText)
+                        }
+                        currentIndex = endIndex + 1
+                    } else {
+                        append(text[currentIndex])
+                        currentIndex++
+                    }
+                }
+                // 이탤릭 처리 (*텍스트*)
+                text.startsWith("*", currentIndex) && !text.startsWith("**", currentIndex) -> {
+                    val endIndex = text.indexOf("*", currentIndex + 1)
+                    if (endIndex != -1 && !text.startsWith("*", endIndex + 1)) {
+                        val italicText = text.substring(currentIndex + 1, endIndex)
+                        withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = Color(0xFFB4BEFE))) {
+                            append(italicText)
+                        }
+                        currentIndex = endIndex + 1
+                    } else {
+                        append(text[currentIndex])
+                        currentIndex++
+                    }
+                }
+                else -> {
+                    append(text[currentIndex])
+                    currentIndex++
+                }
+            }
+        }
+    }
+
+    Text(
+        text = annotatedString,
+        fontSize = fontSize,
+        lineHeight = lineHeight,
+        modifier = modifier
+    )
+}
+
