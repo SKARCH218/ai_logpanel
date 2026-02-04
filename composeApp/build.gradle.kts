@@ -44,9 +44,34 @@ compose.desktop {
         mainClass = "dev.skarch.ai_logpanel.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "dev.skarch.ai_logpanel"
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
+            packageName = "AI-Log-Panel"
             packageVersion = "1.0.0"
+            description = "AI-powered server log management tool"
+            copyright = "© 2024 SKARCH. All rights reserved."
+            vendor = "SKARCH"
+
+            windows {
+                // Windows 전용 설정 - ICO 파일 사용
+                iconFile.set(project.file("src/jvmMain/resources/logo.ico"))
+                menuGroup = "AI-Log-Panel"
+                perUserInstall = true
+
+                // 바로가기 생성
+                shortcut = true
+                dirChooser = true
+
+                // 실행 파일 이름
+                exePackageVersion = packageVersion
+            }
+
+            linux {
+                iconFile.set(project.file("src/jvmMain/resources/logo.png"))
+            }
+
+            macOS {
+                iconFile.set(project.file("src/jvmMain/resources/logo.png"))
+            }
         }
     }
 }

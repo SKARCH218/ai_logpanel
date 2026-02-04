@@ -24,7 +24,10 @@ data class Server(
     val startCommand: String = "", // 서버 시작 명령어
     val osType: String = "Linux", // "Linux" or "Windows"
     val logs: List<String> = emptyList(),
-    val analysis: String? = null
+    val analysis: String? = null,
+    val isRunning: Boolean = false, // 서버 실행 상태
+    val isConnected: Boolean = false, // 연결 상태
+    val errorAnalysis: Map<String, String> = emptyMap() // 에러 로그 -> AI 분석 결과 매핑
 )
 
 class MainViewModel : ViewModel() {
@@ -76,6 +79,54 @@ class MainViewModel : ViewModel() {
         val index = servers.indexOfFirst { it.id == serverId }
         if (index != -1) {
             servers[index] = update(servers[index])
+        }
+    }
+
+    fun setServerRunning(serverId: Int, isRunning: Boolean) {
+        updateServer(serverId) { it.copy(isRunning = isRunning) }
+    }
+
+    fun setServerConnected(serverId: Int, isConnected: Boolean) {
+        updateServer(serverId) { it.copy(isConnected = isConnected) }
+    }
+
+    fun addLog(serverId: Int, log: String) {
+        updateServer(serverId) { server ->
+            val updatedLogs = (server.logs + log).takeLast(500)
+            server.copy(logs = updatedLogs)
+        }
+    }
+
+    fun setLogs(serverId: Int, logs: List<String>) {
+        updateServer(serverId) { it.copy(logs = logs) }
+    }
+
+    fun setErrorAnalysis(serverId: Int, errorLog: String, analysis: String) {
+        updateServer(serverId) { server ->
+            val updatedMap = server.errorAnalysis + (errorLog to analysis)
+            server.copy(errorAnalysis = updatedMap)
+        }
+    }
+
+    fun getErrorAnalysis(serverId: Int, errorLog: String): String? {
+        return servers.find { it.id == serverId }?.errorAnalysis?.get(errorLog)
+    }
+
+    fun getServer(serverId: Int): Server? {
+        return servers.find { it.id == serverId }
+    }
+
+    fun removeLog(serverId: Int, logToRemove: String) {
+        updateServer(serverId) { server ->
+            val updatedLogs = server.logs.filter { it != logToRemove }
+            server.copy(logs = updatedLogs)
+        }
+    }
+
+    fun removeErrorAnalysis(serverId: Int, errorLog: String) {
+        updateServer(serverId) { server ->
+            val updatedMap = server.errorAnalysis - errorLog
+            server.copy(errorAnalysis = updatedMap)
         }
     }
 

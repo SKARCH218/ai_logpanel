@@ -45,20 +45,24 @@ class GeminiRepository(apiKey: String) {
 
     fun askFollowUpQuestion(originalLog: String, previousAnalysis: String, question: String): Flow<String> = flow {
         val prompt = """
-            다음은 이전 분석 내용입니다:
+            당신은 서버 로그 분석 전문가입니다. 
+            사용자가 이전에 분석받은 오류에 대해 추가 질문을 했습니다.
             
-            **원본 로그:**
+            **원본 오류 로그:**
             ```
             $originalLog
             ```
             
-            **이전 분석:**
+            **이전 분석 결과:**
             $previousAnalysis
             
-            **추가 질문:**
+            **사용자의 질문:**
             $question
             
-            위 내용을 바탕으로 질문에 답변해주세요. Markdown 형식으로 답변해주세요.
+            위 질문에 대해 자연스럽고 친절하게 답변해주세요. 
+            질문이 간단한 인사("안녕", "고마워" 등)라면 짧게 응답하고,
+            기술적인 질문이라면 구체적으로 설명해주세요.
+            답변은 Markdown 형식을 사용하되, 과도한 형식은 피해주세요.
         """.trimIndent()
 
         val response = generativeModel.generateContent(

@@ -17,3 +17,11 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# 빌드 결과물
+*.exe
+*.msi
+*.dmg
+*.deb
+*.app
+compose/

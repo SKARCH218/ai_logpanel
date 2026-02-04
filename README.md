@@ -29,6 +29,7 @@ AI-Log Panel/
 ```
 
 ## 빌드 및 실행 방법
+
 ### 1. 의존성 설치
 - JDK 17 이상 필요
 - [Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html) 사용
@@ -43,11 +44,37 @@ AI-Log Panel/
   ./gradlew :composeApp:run
   ```
 
-### 3. API 키 설정
+### 3. EXE 파일로 빌드 (배포용)
+- **Windows EXE 생성**
+  ```powershell
+  .\gradlew :composeApp:packageExe
+  ```
+  생성 위치: `composeApp\build\compose\binaries\main\exe\AI-Log-Panel-1.0.0.exe`
+
+- **Windows MSI 인스톨러 생성**
+  ```powershell
+  .\gradlew :composeApp:packageMsi
+  ```
+  생성 위치: `composeApp\build\compose\binaries\main\msi\AI-Log-Panel-1.0.0.msi`
+
+- **모든 플랫폼 빌드**
+  ```powershell
+  .\gradlew :composeApp:package
+  ```
+
+### 4. API 키 설정
 - `composeApp/src/jvmMain/resources/local.properties` 파일에 아래와 같이 Gemini API 키를 추가하세요.
   ```properties
   GEMINI_API_KEY=your-gemini-api-key
   ```
+
+## 빌드 결과물
+- **EXE**: 단일 실행 파일 (자동 압축 해제 방식)
+- **MSI**: Windows 인스톨러 (프로그램 추가/제거에 등록)
+- **DMG**: macOS 디스크 이미지
+- **DEB**: Linux 패키지
+
+빌드된 파일은 `composeApp/build/compose/binaries/main/` 하위에 생성됩니다.
 
 ## 주요 의존성
 - [JetBrains Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform)

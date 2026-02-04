@@ -253,21 +253,13 @@ fun AnalysisResultScreen(
                                             try {
                                                 val geminiRepository = GeminiRepository(apiKey)
 
-                                                // 자유 형식으로 질문 (컨텍스트 간단하게)
-                                                val prompt = """
-                                                    다음 오류에 대한 질문입니다:
-                                                    
-                                                    [오류]
-                                                    $errorLog
-                                                    
-                                                    [질문]
-                                                    $question
-                                                    
-                                                    간단하고 명확하게 답변해주세요.
-                                                """.trimIndent()
-
+                                                // 자유 형식으로 질문 (askFollowUpQuestion 사용)
                                                 var answer = ""
-                                                geminiRepository.analyzeLog(prompt).collect { chunk ->
+                                                geminiRepository.askFollowUpQuestion(
+                                                    originalLog = errorLog,
+                                                    previousAnalysis = analysis ?: "",
+                                                    question = question
+                                                ).collect { chunk ->
                                                     answer = chunk
                                                 }
 
@@ -312,21 +304,13 @@ fun AnalysisResultScreen(
                                     try {
                                         val geminiRepository = GeminiRepository(apiKey)
 
-                                        // 자유 형식으로 질문 (컨텍스트 간단하게)
-                                        val prompt = """
-                                            다음 오류에 대한 질문입니다:
-                                            
-                                            [오류]
-                                            $errorLog
-                                            
-                                            [질문]
-                                            $question
-                                            
-                                            간단하고 명확하게 답변해주세요.
-                                        """.trimIndent()
-
+                                        // 자유 형식으로 질문 (askFollowUpQuestion 사용)
                                         var answer = ""
-                                        geminiRepository.analyzeLog(prompt).collect { chunk ->
+                                        geminiRepository.askFollowUpQuestion(
+                                            originalLog = errorLog,
+                                            previousAnalysis = analysis ?: "",
+                                            question = question
+                                        ).collect { chunk ->
                                             answer = chunk
                                         }
 

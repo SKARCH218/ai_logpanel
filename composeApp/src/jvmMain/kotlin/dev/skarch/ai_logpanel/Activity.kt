@@ -1,5 +1,7 @@
 package dev.skarch.ai_logpanel
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,8 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.skarch.ai_logpanel.ui.AddServerCard
@@ -52,10 +55,10 @@ fun ServerInputFormImproved(
     var host by remember { mutableStateOf(server?.host ?: "") }
     var user by remember { mutableStateOf(server?.user ?: "") }
     var port by remember { mutableStateOf("22") }
-    var password by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf(server?.password ?: "") }
     var serverPath by remember { mutableStateOf(server?.logPath ?: "") }
-    var startCmd by remember { mutableStateOf("") }
-    var osType by remember { mutableStateOf(if (serverType == "Local") "Windows" else "Linux") }
+    var startCmd by remember { mutableStateOf(server?.startCommand ?: "") }
+    var osType by remember { mutableStateOf(server?.osType ?: (if (serverType == "Local") "Windows" else "Linux")) }
 
     Column(
         modifier = Modifier
@@ -390,5 +393,69 @@ fun ServerTypeCard(
     onClick: () -> Unit,
     modifier: Modifier
 ) {
-    TODO("Not yet implemented")
+    Surface(
+        modifier = modifier
+            .clickable(onClick = onClick),
+        color = Color(0xFF1E2530).copy(alpha = 0.6f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(32.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 아이콘
+            Text(
+                text = icon,
+                fontSize = 64.sp,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // 제목
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            // 설명
+            Text(
+                text = description,
+                color = Color(0xFF9CA3AF),
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // 기능 목록
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                features.forEach { feature ->
+                    Row(
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "✓",
+                            color = Color(0xFF3B82F6),
+                            fontSize = 16.sp,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text(
+                            text = feature,
+                            color = Color(0xFF9CA3AF),
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

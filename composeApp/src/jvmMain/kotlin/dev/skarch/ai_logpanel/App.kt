@@ -1,30 +1,22 @@
 package dev.skarch.ai_logpanel
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.FrameWindowScope
 import dev.skarch.ai_logpanel.ui.MainViewModel
 import dev.skarch.ai_logpanel.ui.theme.GlassmorphismTheme
 import dev.skarch.ai_logpanel.utils.ApiKeyProvider
 import dev.skarch.ai_logpanel.utils.ServerStorage
 import dev.skarch.ai_logpanel.ssh.SshClient
 import androidx.compose.ui.window.WindowState
-import androidx.compose.ui.unit.sp
 import dev.skarch.ai_logpanel.ui.AboutDialog
 import dev.skarch.ai_logpanel.ui.MainPanelImproved
 import dev.skarch.ai_logpanel.ui.MissingApiKeyScreen
@@ -34,7 +26,7 @@ import kotlinx.coroutines.launch
 
 
 @Composable
-fun App(
+fun FrameWindowScope.App(
     windowState: WindowState,
     onMinimize: () -> Unit,
     onMaximize: () -> Unit,
@@ -174,14 +166,15 @@ fun App(
                         if (server != null) {
                             SshClient(
                                 host = server.host,
-                                port = 22,
+                                port = server.port,
                                 user = server.user,
-                                password = "", // 추후 서버 모델에 password 필드 추가 시 사용
+                                password = server.password,
                                 privateKeyPath = server.privateKeyPath
                             )
                         } else null
                     }
                     MainPanelImproved(
+                        viewModel = viewModel,
                         server = server,
                         sshClient = sshClient,
                         onConnect = { /* SSH 클라이언트가 내부적으로 처리 */ },

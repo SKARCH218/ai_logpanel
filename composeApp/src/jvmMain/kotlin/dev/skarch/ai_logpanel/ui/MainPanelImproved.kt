@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit
 // 전문 서버 관리 대시보드 스타일 패널
 @Composable
 fun MainPanelImproved(
+    viewModel: MainViewModel,
     server: Server?,
     sshClient: SshClient?,
     onConnect: suspend () -> Unit,
@@ -59,15 +60,14 @@ fun MainPanelImproved(
     var selectedErrorLog by remember { mutableStateOf<String?>(null) }
     var selectedAnalysis by remember { mutableStateOf<String?>(null) }
 
-    // 로그 상태 관리
-    var logs by remember { mutableStateOf(server?.logs?.toMutableList() ?: mutableListOf<String>()) }
-    var errorLogs by remember { mutableStateOf(
-        logs.filter { it.contains("error", true) || it.contains("fail", true) || it.contains("[ERROR]", true) }
-    ) }
+    // ViewModel에서 서버 상태 가져오기 (화면 전환 시에도 유지됨)
+    val currentServer = server?.id?.let { viewModel.getServer(it) } ?: server
+    val logs = currentServer?.logs ?: emptyList()
+    val isRunning = currentServer?.isRunning ?: false
+    val isConnectedFromServer = currentServer?.isConnected ?: false
 
-    // logs가 변경될 때마다 errorLogs 업데이트
-    LaunchedEffect(logs) {
-        errorLogs = logs.filter { it.contains("error", true) || it.contains("fail", true) || it.contains("[ERROR]", true) }
+    val errorLogs = remember(logs) {
+        logs.filter { it.contains("error", true) || it.contains("fail", true) || it.contains("[ERROR]", true) }
     }
 
     // 성능 데이터
@@ -78,13 +78,29 @@ fun MainPanelImproved(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    var isConnected by remember { mutableStateOf(false) }
-    var isRunning by remember { mutableStateOf(false) }
+    // 로컬 연결 상태 (ViewModel과 동기화)
+    var isConnected by remember(isConnectedFromServer) { mutableStateOf(isConnectedFromServer) }
     var connectionError by remember { mutableStateOf<String?>(null) }
 
     // 로컬 서버 프로세스 및 입출력 스트림 저장
     var localServerProcess by remember { mutableStateOf<Process?>(null) }
     var processOutputStream by remember { mutableStateOf<OutputStream?>(null) }
+
+    // 헬퍼 함수: 로그 추가 (ViewModel에 저장)
+    fun addLog(message: String) {
+        server?.id?.let { viewModel.addLog(it, message) }
+    }
+
+    // 헬퍼 함수: 서버 실행 상태 설정 (ViewModel에 저장)
+    fun setRunning(running: Boolean) {
+        server?.id?.let { viewModel.setServerRunning(it, running) }
+    }
+
+    // 헬퍼 함수: 연결 상태 설정 (ViewModel에 저장)
+    fun setConnected(connected: Boolean) {
+        isConnected = connected
+        server?.id?.let { viewModel.setServerConnected(it, connected) }
+    }
 
     // SSH 클라이언트 에러 핸들러 설정
     LaunchedEffect(sshClient) {
@@ -245,6 +261,8 @@ fun MainPanelImproved(
                 ) {
                     when (sidebarTab) {
                         0 -> ErrorLogSidebar(
+                            viewModel = viewModel,
+                            serverId = server?.id ?: 0,
                             errorLogs = errorLogs,
                             apiKey = apiKey,
                             onShowAnalysis = { log, analysis ->
@@ -253,7 +271,11 @@ fun MainPanelImproved(
                                 showAnalysisResult = true
                             },
                             onRemoveLog = { log ->
-                                errorLogs = errorLogs.filter { it != log }
+                                // ViewModel에서 로그와 분석 결과 삭제
+                                server?.id?.let { serverId ->
+                                    viewModel.removeLog(serverId, log)
+                                    viewModel.removeErrorAnalysis(serverId, log)
+                                }
                             }
                         )
                     }
@@ -277,12 +299,12 @@ fun MainPanelImproved(
                         // Local 모드일 때는 onConnect가 시작 역할
                         if (server?.serverType == "Local") {
                             coroutineScope.launch {
-                                logs.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                                logs.add("로컬 터미널에서 서버 시작 중...")
-                                logs.add("경로: ${server.logPath}")
-                                logs.add("명령어: ${server.startCommand}")
-                                logs.add("OS: ${System.getProperty("os.name")}")
-                                logs.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                                addLog("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                                addLog("로컬 터미널에서 서버 시작 중...")
+                                addLog("경로: ${server.logPath}")
+                                addLog("명령어: ${server.startCommand}")
+                                addLog("OS: ${System.getProperty("os.name")}")
+                                addLog("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
                                 withContext(Dispatchers.IO) {
                                     try {
@@ -306,9 +328,9 @@ fun MainPanelImproved(
                                         processBuilder.redirectErrorStream(true)
 
                                         withContext(Dispatchers.Main) {
-                                            logs.add("프로세스 시작 중...")
-                                            isRunning = true
-                                            isConnected = true
+                                            addLog("프로세스 시작 중...")
+                                            setRunning(true)
+                                            setConnected(true)
                                         }
 
                                         val process = processBuilder.start()
@@ -316,7 +338,7 @@ fun MainPanelImproved(
                                         processOutputStream = process.outputStream // OutputStream 저장
 
                                         withContext(Dispatchers.Main) {
-                                            logs.add("✓ 프로세스 생성됨 (PID: ${process.pid()})")
+                                            addLog("✓ 프로세스 생성됨 (PID: ${process.pid()})")
                                         }
 
                                         // Windows: UTF-8 코드페이지 설정
@@ -332,7 +354,7 @@ fun MainPanelImproved(
                                             writer.write("$startCommand\n")
                                             writer.flush()
                                             withContext(Dispatchers.Main) {
-                                                logs.add("> $startCommand")
+                                                addLog("> $startCommand")
                                             }
                                         }
 
@@ -370,27 +392,27 @@ fun MainPanelImproved(
                                                     }
 
                                                     withContext(Dispatchers.Main) {
-                                                        logs = (logs + currentLine).takeLast(500).toMutableList()
+                                                        addLog(currentLine)
                                                     }
                                                 }
 
                                                 withContext(Dispatchers.Main) {
-                                                    logs.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                                                    logs.add("✓ 로컬 서버 프로세스 완료 (총 $lineCount 줄)")
-                                                    logs.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                                                    addLog("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                                                    addLog("✓ 로컬 서버 프로세스 완료 (총 $lineCount 줄)")
+                                                    addLog("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                                                 }
 
                                                 // 프로세스가 정상 종료됨
                                                 withContext(Dispatchers.Main) {
                                                     processOutputStream?.close()
                                                     processOutputStream = null
-                                                    isRunning = false
-                                                    isConnected = false
+                                                    setRunning(false)
+                                                    setConnected(false)
                                                     localServerProcess = null
                                                 }
                                             } catch (e: Exception) {
                                                 withContext(Dispatchers.Main) {
-                                                    logs.add("✗ 프로세스 스트리밍 오류: ${e.javaClass.simpleName}: ${e.message}")
+                                                    addLog("✗ 프로세스 스트리밍 오류: ${e.javaClass.simpleName}: ${e.message}")
                                                     e.printStackTrace()
                                                 }
                                             }
@@ -401,15 +423,15 @@ fun MainPanelImproved(
                                         }
                                     } catch (e: Exception) {
                                         withContext(Dispatchers.Main) {
-                                            logs.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                                            logs.add("✗ 로컬 서버 시작 실패")
-                                            logs.add("오류 타입: ${e.javaClass.simpleName}")
-                                            logs.add("오류 메시지: ${e.message}")
-                                            logs.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                                            addLog("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                                            addLog("✗ 로컬 서버 시작 실패")
+                                            addLog("오류 타입: ${e.javaClass.simpleName}")
+                                            addLog("오류 메시지: ${e.message}")
+                                            addLog("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                                             e.printStackTrace()
                                             snackbarHostState.showSnackbar("시작 실패: ${e.message}")
-                                            isRunning = false
-                                            isConnected = false
+                                            setRunning(false)
+                                            setConnected(false)
                                             localServerProcess = null
                                         }
                                     }
@@ -418,14 +440,14 @@ fun MainPanelImproved(
                         } else {
                             // SSH 서버 연결
                             coroutineScope.launch {
-                                logs.add("SSH 연결 시도 중...")
+                                addLog("SSH 연결 시도 중...")
                                 val result = sshClient?.connect()
                                 if (result?.isSuccess == true) {
-                                    isConnected = true
-                                    logs.add("✓ SSH 연결 성공")
+                                    setConnected(true)
+                                    addLog("✓ SSH 연결 성공")
                                     snackbarHostState.showSnackbar("서버에 연결되었습니다")
                                 } else {
-                                    logs.add("✗ SSH 연결 실패: ${result?.exceptionOrNull()?.message}")
+                                    addLog("✗ SSH 연결 실패: ${result?.exceptionOrNull()?.message}")
                                     snackbarHostState.showSnackbar("연결 실패: ${result?.exceptionOrNull()?.message}")
                                 }
                             }
@@ -441,13 +463,13 @@ fun MainPanelImproved(
                         }
 
                         if (server?.serverType == "SSH") {
-                            isRunning = true
+                            setRunning(true)
                             coroutineScope.launch {
-                                logs.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                                logs.add("SSH 서버 시작 중...")
-                                logs.add("경로: ${server.logPath}")
-                                logs.add("명령어: ${server.startCommand}")
-                                logs.add("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                                addLog("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                                addLog("SSH 서버 시작 중...")
+                                addLog("경로: ${server.logPath}")
+                                addLog("명령어: ${server.startCommand}")
+                                addLog("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
                                 val startCommand = if (server.startCommand.isNotBlank()) {
                                     server.startCommand
@@ -460,7 +482,7 @@ fun MainPanelImproved(
                                     serverPath = server.logPath,
                                     startCommand = startCommand,
                                     onLog = { log ->
-                                        logs = (logs + log).takeLast(500).toMutableList()
+                                        addLog(log)
                                     }
                                 )
 
@@ -472,7 +494,7 @@ fun MainPanelImproved(
                         coroutineScope.launch {
                             if (server?.serverType == "Local") {
                                 // Local 모드: 프로세스 강제 종료
-                                logs.add("로컬 서버 중지 중...")
+                                addLog("로컬 서버 중지 중...")
 
                                 withContext(Dispatchers.IO) {
                                     try {
@@ -491,8 +513,8 @@ fun MainPanelImproved(
                                                             pid.toString()
                                                         ).start()
                                                         killProcess.waitFor(5, TimeUnit.SECONDS)
-                                                        logs.add("✓ 프로세스 트리 종료됨 (PID: $pid)")
-                                                    } catch (e: Exception) {
+                                                        addLog("✓ 프로세스 트리 종료됨 (PID: $pid)")
+                                                    } catch (_: Exception) {
                                                         // taskkill 실패 시 기본 종료 방식 사용
                                                         process.destroy()
                                                     }
@@ -507,51 +529,51 @@ fun MainPanelImproved(
                                                     // 강제 종료
                                                     process.destroyForcibly()
                                                     process.waitFor(2, TimeUnit.SECONDS)
-                                                    logs.add("⚠ 프로세스 강제 종료됨")
+                                                    addLog("⚠ 프로세스 강제 종료됨")
                                                 } else {
-                                                    logs.add("✓ 로컬 서버 정상 종료됨")
+                                                    addLog("✓ 로컬 서버 정상 종료됨")
                                                 }
 
                                                 // 스트림과 프로세스 정리
                                                 processOutputStream?.close()
                                                 processOutputStream = null
                                                 localServerProcess = null
-                                                isConnected = false
-                                                isRunning = false
+                                                setConnected(false)
+                                                setRunning(false)
                                             } else {
-                                                logs.add("프로세스가 이미 종료되었습니다")
+                                                addLog("프로세스가 이미 종료되었습니다")
                                                 localServerProcess = null
-                                                isConnected = false
-                                                isRunning = false
+                                                setConnected(false)
+                                                setRunning(false)
                                             }
                                         } ?: run {
-                                            logs.add("실행 중인 프로세스가 없습니다")
-                                            isConnected = false
-                                            isRunning = false
+                                            addLog("실행 중인 프로세스가 없습니다")
+                                            setConnected(false)
+                                            setRunning(false)
                                         }
 
                                         withContext(Dispatchers.Main) {
                                             snackbarHostState.showSnackbar("로컬 서버를 중지했습니다")
                                         }
                                     } catch (e: Exception) {
-                                        logs.add("✗ 프로세스 종료 실패: ${e.message}")
+                                        addLog("✗ 프로세스 종료 실패: ${e.message}")
                                         withContext(Dispatchers.Main) {
                                             snackbarHostState.showSnackbar("종료 실패: ${e.message}")
                                         }
-                                        isRunning = false
+                                        setRunning(false)
                                     }
                                 }
                             } else {
                                 // SSH 모드: 종료 명령 전송 (Ctrl+C)
-                                logs.add("서버 중지 요청...")
-                                isRunning = false
+                                addLog("서버 중지 요청...")
+                                setRunning(false)
 
                                 // SSH 세션에 종료 신호 전송 시도
                                 try {
-                                    logs.add("SSH 서버 중지 신호 전송")
+                                    addLog("SSH 서버 중지 신호 전송")
                                     snackbarHostState.showSnackbar("서버 중지 신호를 전송했습니다")
                                 } catch (e: Exception) {
-                                    logs.add("✗ 중지 신호 전송 실패: ${e.message}")
+                                    addLog("✗ 중지 신호 전송 실패: ${e.message}")
                                     snackbarHostState.showSnackbar("중지 실패: ${e.message}")
                                 }
                             }
@@ -559,9 +581,9 @@ fun MainPanelImproved(
                     },
                     onDisconnect = {
                         sshClient?.disconnect()
-                        isConnected = false
-                        isRunning = false
-                        logs.add("SSH 연결 종료")
+                        setConnected(false)
+                        setRunning(false)
+                        addLog("SSH 연결 종료")
                         coroutineScope.launch {
                             snackbarHostState.showSnackbar("서버 연결이 해제되었습니다")
                         }
@@ -627,7 +649,7 @@ fun MainPanelImproved(
 
                             val cmd = commandInput
                             commandInput = ""
-                            logs.add("> $cmd")
+                            addLog("> $cmd")
 
                             coroutineScope.launch {
                                 if (server?.serverType == "Local") {
@@ -640,19 +662,19 @@ fun MainPanelImproved(
                                                 writer.flush()
                                             } ?: run {
                                                 withContext(Dispatchers.Main) {
-                                                    logs.add("✗ 프로세스가 실행 중이지 않습니다")
+                                                    addLog("✗ 프로세스가 실행 중이지 않습니다")
                                                 }
                                             }
                                         } catch (e: Exception) {
                                             withContext(Dispatchers.Main) {
-                                                logs.add("✗ 명령 전송 실패: ${e.message}")
+                                                addLog("✗ 명령 전송 실패: ${e.message}")
                                             }
                                         }
                                     }
                                 } else {
                                     // SSH 모드: SSH로 명령 실행
                                     sshClient?.executeCommand(cmd) { output ->
-                                        logs = (logs + output).takeLast(500).toMutableList()
+                                        addLog(output)
                                     }
                                 }
                             }

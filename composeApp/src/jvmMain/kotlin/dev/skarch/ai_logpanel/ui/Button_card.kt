@@ -142,53 +142,82 @@ fun ServerCard(
         shape = RoundedCornerShape(16.dp),
         shadowElevation = 4.dp
     ) {
-        Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-            Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // 온라인/오프라인 상태 표시 (좌측 상단)
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = if (server.isRunning) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFF6B7280).copy(alpha = 0.2f)
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            server.name,
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            server.host,
-                            color = Color(0xFF9CA3AF),
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
-                            Text("✏", fontSize = 14.sp, color = Color(0xFF2196F3))
-                        }
-                        IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                            Text("🗑", fontSize = 14.sp, color = Color(0xFFF44336))
-                        }
-                    }
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(
+                                if (server.isRunning) Color(0xFF10B981) else Color(0xFF6B7280),
+                                shape = RoundedCornerShape(3.dp)
+                            )
+                    )
+                    Text(
+                        if (server.isRunning) "온라인" else "오프라인",
+                        color = if (server.isRunning) Color(0xFF10B981) else Color(0xFF9CA3AF),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
+            }
 
-                Spacer(modifier = Modifier.weight(1f))
+            // 수정/삭제 버튼 (우측 상단)
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                    Text("✎", fontSize = 14.sp, color = Color(0xFF2196F3))
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                    Text("X", fontSize = 14.sp, color = Color(0xFFF44336))
+                }
+            }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+            // 서버 정보 (중앙)
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+            ) {
+                Text(
+                    server.name,
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // 하단 정보
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(20.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (server.serverType != "Local") {
                     InfoChip("👤 ${server.user}")
-                    if (server.logPath.isNotEmpty()) {
-                        InfoChip("📁 서버")
-                    }
                 }
+                InfoChip(if (server.serverType == "Local") "💻 로컬" else "🌐 SSH")
             }
         }
     }
@@ -341,3 +370,16 @@ fun MetricCard(
     }
 }
 
+@Composable
+fun WindowControlButton(icon: String, color: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .clickable { onClick() }
+            .background(Color.Transparent),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(icon, color = color, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+    }
+}

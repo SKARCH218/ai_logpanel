@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +48,8 @@ import kotlinx.coroutines.launch
 // 에러 로그 사이드바 (오류/경고 색상, 스크롤바)
 @Composable
 fun ErrorLogSidebar(
+    viewModel: MainViewModel,
+    serverId: Int,
     errorLogs: List<String>,
     apiKey: String,
     onShowAnalysis: (String, String?) -> Unit = { _, _ -> },
@@ -77,7 +81,7 @@ fun ErrorLogSidebar(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(errorLogs) { log ->
-                        ErrorLogCard(log, apiKey, onShowAnalysis, onRemoveLog)
+                        ErrorLogCard(viewModel, serverId, log, apiKey, onShowAnalysis, onRemoveLog)
                     }
                 }
 
@@ -85,7 +89,14 @@ fun ErrorLogSidebar(
                 VerticalScrollbar(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .fillMaxHeight(),
+                        .fillMaxHeight()
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                while (true) {
+                                    awaitPointerEvent()
+                                }
+                            }
+                        },
                     adapter = rememberScrollbarAdapter(listState),
                     style = ScrollbarStyle(
                         minimalHeight = 32.dp,
@@ -104,6 +115,8 @@ fun ErrorLogSidebar(
 // 에러 로그 카드 (오류/경고 색상, 버튼 기반 분석)
 @Composable
 fun ErrorLogCard(
+    viewModel: MainViewModel,
+    serverId: Int,
     log: String,
     apiKey: String,
     onShowAnalysis: (String, String?) -> Unit = { _, _ -> },
@@ -113,8 +126,9 @@ fun ErrorLogCard(
     val isError = logLower.contains("error") || logLower.contains("✗") || logLower.contains("[error]")
     val isWarning = logLower.contains("warn") || logLower.contains("warning") || logLower.contains("[warn]")
 
-    // 저장된 분석 결과 로드
-    var aiAnalysis by remember { mutableStateOf(dev.skarch.ai_logpanel.utils.ServerStorage.loadAnalysisResult(log)) }
+    // ViewModel에서 저장된 분석 결과 가져오기
+    val savedAnalysis = viewModel.getErrorAnalysis(serverId, log)
+    var aiAnalysis by remember(savedAnalysis) { mutableStateOf(savedAnalysis) }
     var isAnalyzing by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -160,8 +174,6 @@ fun ErrorLogCard(
                 OutlinedButton(
                     onClick = {
                         onRemoveLog(log)
-                        // 분석 결과도 함께 삭제
-                        dev.skarch.ai_logpanel.utils.ServerStorage.deleteAnalysisResult(log)
                     },
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = Color(0xFFEF4444)
@@ -220,8 +232,8 @@ fun ErrorLogCard(
                                     geminiRepository.analyzeLog(log).collect { analysis ->
                                         aiAnalysis = analysis
                                         isAnalyzing = false
-                                        // 분석 결과 저장
-                                        dev.skarch.ai_logpanel.utils.ServerStorage.saveAnalysisResult(log, analysis)
+                                        // 분석 결과를 ViewModel에 저장
+                                        viewModel.setErrorAnalysis(serverId, log, analysis)
                                     }
                                 } catch (e: Exception) {
                                     aiAnalysis = "분석 실패: ${e.message}"
@@ -262,34 +274,23 @@ fun ConsoleLogPanel(logs: List<String>, modifier: Modifier = Modifier) {
 
     // 사용자가 수동으로 스크롤했는지 확인
     var isUserScrolling by remember { mutableStateOf(false) }
-    var lastLogCount by remember { mutableStateOf(logs.size) }
 
     // 로그가 추가될 때마다 자동 스크롤 (사용자가 스크롤하지 않은 경우)
     LaunchedEffect(logs.size) {
         if (logs.isNotEmpty() && !isUserScrolling) {
-            listState.animateScrollToItem(logs.size - 1)
-        }
-        lastLogCount = logs.size
-    }
-
-    // 스크롤 상태 감지
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
-            // 사용자가 맨 아래가 아닌 곳으로 스크롤하면 자동 스크롤 중지
-            val isAtBottom = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index == logs.size - 1
-            if (!isAtBottom) {
-                isUserScrolling = true
-            }
+            // 즉시 스크롤 (애니메이션 없이)
+            listState.scrollToItem(logs.size - 1)
         }
     }
 
-    // 맨 아래로 이동하면 자동 스크롤 재개
-    LaunchedEffect(listState.firstVisibleItemIndex, listState.layoutInfo.totalItemsCount) {
+    // 스크롤 위치 감지하여 사용자 스크롤 여부 판단
+    LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
         if (logs.isNotEmpty()) {
-            val isAtBottom = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index == logs.size - 1
-            if (isAtBottom) {
-                isUserScrolling = false
-            }
+            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val isAtBottom = lastVisibleIndex >= logs.size - 1
+
+            // 맨 아래에 있으면 자동 스크롤 모드, 아니면 수동 모드
+            isUserScrolling = !isAtBottom
         }
     }
 
@@ -322,7 +323,7 @@ fun ConsoleLogPanel(logs: List<String>, modifier: Modifier = Modifier) {
                                 isUserScrolling = false
                                 coroutineScope.launch {
                                     if (logs.isNotEmpty()) {
-                                        listState.animateScrollToItem(logs.size - 1)
+                                        listState.scrollToItem(logs.size - 1)
                                     }
                                 }
                             },
@@ -330,7 +331,7 @@ fun ConsoleLogPanel(logs: List<String>, modifier: Modifier = Modifier) {
                             border = BorderStroke(1.dp, Color(0xFF2196F3)),
                             modifier = Modifier.height(32.dp)
                         ) {
-                            Text("맨 아래로", fontSize = 12.sp)
+                            Text("↓ 맨 아래로", fontSize = 12.sp)
                         }
                     }
                 }
@@ -348,12 +349,21 @@ fun ConsoleLogPanel(logs: List<String>, modifier: Modifier = Modifier) {
                     }
                 }
 
-                // 스크롤바
+                // 스크롤바 (클릭 시 창 이동 방지)
                 VerticalScrollbar(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight()
-                        .padding(vertical = 16.dp),
+                        .padding(vertical = 16.dp)
+                        .pointerInput(Unit) {
+                            // 스크롤바 클릭 이벤트를 소비하여 WindowDraggableArea로 전파 방지
+                            awaitEachGesture {
+                                while (true) {
+                                    awaitPointerEvent()
+                                    // 이벤트만 소비하고 아무것도 안함
+                                }
+                            }
+                        },
                     adapter = rememberScrollbarAdapter(listState),
                     style = ScrollbarStyle(
                         minimalHeight = 32.dp,
